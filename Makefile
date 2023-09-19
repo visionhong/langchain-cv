@@ -26,9 +26,11 @@ build-image:
 
 run:
 	docker run -d --gpus all -it --net=host --privileged \
-	-v ~/kubwa/study/kubchain/
 	-e DISPLAY=$DISPLAY \
 	-p 8507:8507 \
 	--name=langchain-cv \
 	--ipc=host -it langchain-cv/torch:2.0.1
+
+remove:
+	docker stop langchain-cv && docker rm langchain-cv
 	
