@@ -1,0 +1,87 @@
+import streamlit as st
+import streamlit_authenticator as stauth
+from st_pages import show_pages_from_config, add_page_title
+
+import os
+from dotenv import load_dotenv
+import yaml
+from yaml.loader import SafeLoader
+
+import openai
+
+def main():
+    hide_bar= """
+        <style>
+        [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+            visibility:hidden;
+            width: 0px;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
+            visibility:hidden;
+        }
+        </style>
+    """
+
+    with open('.streamlit/credentials.yaml') as file:
+        config = yaml.load(file, Loader=SafeLoader)
+        
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days'],
+    )
+
+    name, authentication_status, username = authenticator.login('Login', 'main')
+        
+    if authentication_status == False:
+        st.error("Username/password is incorrect")
+        st.markdown(hide_bar, unsafe_allow_html=True)
+
+    elif authentication_status == None:
+        st.warning("Please enter your username and password")
+        st.markdown(hide_bar, unsafe_allow_html=True)
+        
+    elif authentication_status:        
+        st.toast(f'Welcome *{username}* 😊')
+                
+        load_dotenv()
+        # Load the OpenAI API key from the environment variable
+        if os.getenv("OPENAI_API_KEY") is None or os.getenv("OPENAI_API_KEY") == "":
+            print("OPENAI_API_KEY is not set")
+            exit(1)
+        else:
+            openai.api_key = os.getenv("OPENAI_API_KEY")
+            print("OPENAI_API_KEY is set")
+
+    
+        show_pages_from_config(".streamlit/pages.toml")
+        add_page_title()
+        
+        st.write("")
+        tab1 = st.tabs(["Image Editer"])
+        
+        
+        st.markdown(
+            """
+            ##### Image Editer
+            Image Generation기술을 활용하여 이미지를 편집해보세요.
+            """
+        )
+
+        st.markdown("#### Demo")
+        video_file = open('.assets/demo.mp4', 'rb')
+        video_bytes = video_file.read()
+        st.video(video_bytes)
+        
+        st.write("")
+        _, col = st.columns((15, 2))
+        with col:
+            authenticator.logout('Logout', 'main')
+    
+    
+
+if __name__ == "__main__":
+    main()
+    
+    

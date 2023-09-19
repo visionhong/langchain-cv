@@ -1,0 +1,14 @@
+[[pages]]
+path = "main.py"
+name = "Langchain for CV"
+icon = "🔗"
+
+[[pages]]
+name = "Playground"
+icon = "🚁"
+is_section = true
+
+[[pages]]
+path = "app/image_editor.py"
+name = "Image Editer"
+icon = "🎨" 
