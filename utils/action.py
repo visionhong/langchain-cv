@@ -15,3 +15,6 @@ def reset_inference_image():
     
     st.session_state["req_history"] = []
     st.session_state["res_history"] = []
+    
+def reset_text():
+    st.session_state["text"] = ""

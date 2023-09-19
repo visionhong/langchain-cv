@@ -18,13 +18,19 @@ COPY . /home/appuser/langchain-cv
 
 RUN apt-get update && apt-get install --no-install-recommends wget ffmpeg=7:* \
     libsm6=2:* libxext6=2:* git=1:* \
-    vim=2:* -y \
-    && apt-get clean && apt-get autoremove && rm -rf /var/lib/apt/lists/*
+    vim=2:* curl -y \
+    && apt-get clean && apt-get autoremove && rm -rf /var/lib/apt/lists/* \
+    && curl -sL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get -qq install nodejs --yes
+
+WORKDIR /home/appuser/langchain-cv/frontend
+RUN npm i && npm run build
 
 WORKDIR /home/appuser/langchain-cv/Grounded-Segment-Anything
 RUN python -m pip install --no-cache-dir -e segment_anything && \
-    CUDA_HOME=/usr/local/cuda-11.7 python -m pip install --no-cache-dir -e GroundingDINO 
-    #pip install https://github.com/IDEA-Research/GroundingDINO/archive/refs/tags/v0.1.0-alpha2.tar.gz
+    CUDA_HOME=/usr/local/cuda-11.7 pip install https://github.com/IDEA-Research/GroundingDINO/archive/refs/tags/v0.1.0-alpha2.tar.gz && \
+    python -m pip install --no-cache-dir -e GroundingDINO 
+    
 
 WORKDIR /home/appuser/langchain-cv
 RUN pip install --no-cache-dir -r requirements.txt

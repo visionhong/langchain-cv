@@ -14,5 +14,6 @@ pypdf==3.16.0
 streamlit_chat==0.1.1
 streamlit_authenticator==0.2.3
 streamlit_drawable_canvas==0.9.3
+streamlit_extras
 supervision==0.14.0
 loguru==0.7.2

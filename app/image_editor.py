@@ -2,6 +2,7 @@ import streamlit as st
 from st_pages import add_page_title
 from streamlit_drawable_canvas import st_canvas
 from streamlit_chat import message
+from streamlit_extras.no_default_selectbox import selectbox
 
 import os
 import shutil
@@ -13,7 +14,7 @@ from PIL import Image, ImageOps
 from utils.util import resize_image, xywh2xyxy
 from utils.template import inference_template, image_generate_template
 from utils.agent import multi_modal_agent
-from utils.action import backward_inference_image, forward_inference_image, reset_inference_image
+from utils.action import backward_inference_image, forward_inference_image, reset_inference_image, reset_text
 from utils.inference import wurstchen
 
 
@@ -46,12 +47,26 @@ def image_editor():
                 with st.spinner(text="In progress..."):
                     agent = multi_modal_agent()
                     agent(image_generate_template(prompt=prompt, num_images=num_images))
-                 
-                    for i in st.session_state["generated_images"]:
-                        st.image(i)
-                
+                    
+                    n = 1 if num_images <= 2 else 2
+                    groups = []
+                    cnt = 0
+                    for i in range(0, len(st.session_state["generated_images"]), n):
+                        groups.append(st.session_state["generated_images"][i:i+n])
 
-    if uploaded_image is not None:
+                    for group in groups:
+                        cols = st.columns(n)
+                        for i, image_file in enumerate(group):
+                            cnt += 1
+                            cols[i].image(image_file, caption=cnt)
+
+                option = selectbox(
+                    'Choose a image',
+                    range(1, len(st.session_state["generated_images"])+1), on_change=reset_text)
+
+
+            
+    if uploaded_image is not None or option is not None:
         prompt = st.chat_input("Send a message")
         
         if "image_state" not in st.session_state:
