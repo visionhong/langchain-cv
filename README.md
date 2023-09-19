@@ -1,2 +1,2 @@
-# langchain_cv
+# langchain-cv
 Langchain for Computer Vision
