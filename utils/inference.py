@@ -20,11 +20,11 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from groundingdino.util.inference import Model
 from EfficientSAM.LightHQSAM.setup_light_hqsam import setup_model
-from segment_anything import sam_model_registry, SamPredictor
+from segment_anything import sam_model_registry, SamPredictor, SamAutomaticMaskGenerator
 
 
 from utils.lama_cleaner_helper import norm_img, load_jit_model
-from utils.util import combine_masks
+from utils.util import combine_masks, random_hex_color
 
 
 def image_captioner(img_path):
@@ -157,7 +157,7 @@ def light_hqsam(image, coordinates):
     
     sam_predictor = SamPredictor(light_hqsam)
     
-    mask = segment(
+    mask, segmented_image = segment(
         sam_predictor=sam_predictor,
         image=image,
         coordinates= coordinates
@@ -165,10 +165,10 @@ def light_hqsam(image, coordinates):
     if len(mask.shape) == 3:
         mask = mask.squeeze(0)
     
-    return image, mask
+    return image, mask, Image.fromarray(segmented_image)
 
 def sd_inpaint(image: Image.Image, mask: Image.Image, inpaint_prompt):
-    image.save("aa.jpg")
+
     pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                                                              torch_dtype=torch.float16, 
                                                              variant="fp16").to("cuda")
@@ -185,8 +185,9 @@ def sd_inpaint(image: Image.Image, mask: Image.Image, inpaint_prompt):
 
 def segment(sam_predictor, image, coordinates) -> np.ndarray:
     sam_predictor.set_image(image)
-    result_masks = []
+     
     if coordinates.shape[1] == 4: # box
+        result_masks = []
         for coord in coordinates:  # box가 여러개인 경우에는 하나씩 처리해야 함
             masks, scores, logits = sam_predictor.predict(
                 box=coord,
@@ -194,9 +195,8 @@ def segment(sam_predictor, image, coordinates) -> np.ndarray:
             )
             index = np.argmax(scores)
             result_masks.append(masks[index])
-            
+        
         combined_mask = combine_masks(result_masks) # 여러개의 mask를 or 연산
-        return combined_mask
             
     else: # point
         masks, scores, logits = sam_predictor.predict(
@@ -206,9 +206,19 @@ def segment(sam_predictor, image, coordinates) -> np.ndarray:
         )
 
         index = np.argmax(scores)
-        result_masks.append(masks[index])
-
-        return np.array(result_masks)
+        combined_mask = masks[index][np.newaxis, :, :]
+    
+    mask_annotator = sv.MaskAnnotator(sv.Color.from_hex(color_hex=random_hex_color()))
+    detections = sv.Detections(
+        xyxy=sv.mask_to_xyxy(masks=combined_mask),
+        mask=combined_mask
+    )
+    # detections = detections[detections.area == np.max(detections.area)]
+    segmented_image = mask_annotator.annotate(scene=cv2.cvtColor(image, cv2.COLOR_RGB2BGR), detections=detections)
+    segmented_image = cv2.cvtColor(segmented_image, cv2.COLOR_BGR2RGB)
+            
+    return combined_mask, segmented_image   
+        
 
 def lama_cleaner(image, mask, device):
     LAMA_MODEL_URL = os.environ.get(

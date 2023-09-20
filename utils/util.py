@@ -2,6 +2,9 @@ import os
 import cv2
 from PIL import Image
 import re
+import numpy as np
+import random
+
 
 def save_uploaded_image(directory, uploaded_images) :
     os.makedirs(directory, exist_ok=True)
@@ -122,3 +125,10 @@ def combine_masks(mask_list):
         combined_mask = np.logical_or(combined_mask, mask)
     
     return combined_mask[np.newaxis, :, :]
+
+def random_hex_color():
+    color = random.randrange(0, 2**24)
+    hex_color = hex(color)
+    std_color = "#" + hex_color[2:]
+    
+    return std_color

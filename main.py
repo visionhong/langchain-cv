@@ -59,26 +59,26 @@ def main():
         add_page_title()
         
         st.write("")
-        tab1 = st.tabs(["Image Editer"])
+        tab1, tab2 = st.tabs(["Image Editer", "Image Generator"])
         
-        
-        st.markdown(
-            """
-            ##### Image Editer
-            Image Generation기술을 활용하여 이미지를 편집해보세요.
-            """
-        )
+        with tab1:
+            st.markdown(
+                """
+                ##### Image Editer
+                이미지에서 객체를 바꾸거나 지우고, 이미지 스타일을 변환할 수 있습니다.
+                """
+            )
 
-        st.markdown("#### Demo")
-        video_file = open('.assets/demo.mp4', 'rb')
-        video_bytes = video_file.read()
-        st.video(video_bytes)
+            st.markdown("#### Demo")
+            video_file = open('.assets/demo.mp4', 'rb')
+            video_bytes = video_file.read()
+            st.video(video_bytes)
+            
+            st.write("")
+            _, col = st.columns((15, 2))
+            with col:
+                authenticator.logout('Logout', 'main')
         
-        st.write("")
-        _, col = st.columns((15, 2))
-        with col:
-            authenticator.logout('Logout', 'main')
-    
     
 
 if __name__ == "__main__":

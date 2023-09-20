@@ -18,3 +18,6 @@ def reset_inference_image():
     
 def reset_text():
     st.session_state["text"] = ""
+    
+def select_image():
+    st.session_state["confirm"] = True

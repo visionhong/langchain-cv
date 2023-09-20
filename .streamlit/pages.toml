@@ -11,4 +11,9 @@ is_section = true
 [[pages]]
 path = "app/image_editor.py"
 name = "Image Editer"
-icon = "🎨" 
+icon = "✏️" 
+
+[[pages]]
+path = "app/image_generator.py"
+name = "Image Generator"
+icon = "🌄" 
