@@ -2,15 +2,14 @@ from langchain import PromptTemplate
 
 
 # PlayGround
-def inference_template(prompt):         
+def image_editor_template(prompt):         
     prompt_template = PromptTemplate.from_template(
         """
             input_prompt: {prompt}
             
-            The input_prompt must be in English.
-            Especially when using the 'grounded_sam' tool, the classes to be included in the 'class_list' must be in English.
-            
-            And respond should be Korean.           
+            Make sure prompt must be in English when using the tool.
+            Make sure to provide the response after using a tool.
+         
         """
     )
     

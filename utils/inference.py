@@ -2,8 +2,6 @@ import sys
 sys.path.append('Grounded-Segment-Anything')
 sys.path.append('Grounded-Segment-Anything/EfficientSAM')
 
-import streamlit as st
-
 import os
 import numpy as np
 import torch
@@ -12,19 +10,17 @@ import cv2
 from PIL import Image, ImageOps
 import supervision as sv
 
-from diffusers import StableDiffusionInstructPix2PixPipeline, EulerAncestralDiscreteScheduler, AutoPipelineForText2Image
+from diffusers import  AutoPipelineForText2Image
 from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
-from diffusers import AutoPipelineForInpainting
 from transformers import CLIPProcessor, CLIPModel
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from groundingdino.util.inference import Model
-from EfficientSAM.LightHQSAM.setup_light_hqsam import setup_model
-from segment_anything import sam_model_registry, SamPredictor, SamAutomaticMaskGenerator
+from segment_anything import SamPredictor
 
-
-from utils.lama_cleaner_helper import norm_img, load_jit_model
+from utils.lama_cleaner_helper import norm_img
 from utils.util import combine_masks, random_hex_color
+from utils.model_setup import get_sam, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix
 
 
 def image_captioner(img_path):
@@ -130,62 +126,30 @@ def grounded_sam(image_path, situation_list):
     return cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
 
 
-
-
 def instruct_pix2pix(image, prompt):
-    model_name = "timbrooks/instruct-pix2pix"
-    pipe = StableDiffusionInstructPix2PixPipeline.from_pretrained(model_name, 
-                                                                    torch_dtype=torch.float16, 
-                                                                    safety_checker=None)
-    pipe.to("cuda")
-    pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+    pipe = get_instruct_pix2pix()
     
     image = ImageOps.exif_transpose(image)
-
     images = pipe(prompt, image=image, num_inference_steps=20, image_guidance_scale=1.5, guidance_scale=7).images
     return images
 
-def light_hqsam(image, coordinates):
+def sam(image, coordinates):
     image = np.array(image)
-        
-    HQSAM_CHECKPOINT_PATH = "./checkpoints/sam_hq_vit_tiny.pth"
-    checkpoint = torch.load(HQSAM_CHECKPOINT_PATH)
-    
-    light_hqsam = setup_model()
-    light_hqsam.load_state_dict(checkpoint, strict=True)
-    light_hqsam.to(device="cuda")
-    
-    sam_predictor = SamPredictor(light_hqsam)
+    sam_predictor = get_sam(image)
     
     mask, segmented_image = segment(
         sam_predictor=sam_predictor,
         image=image,
         coordinates= coordinates
         )
+    
     if len(mask.shape) == 3:
         mask = mask.squeeze(0)
     
     return image, mask, Image.fromarray(segmented_image)
 
-def sd_inpaint(image: Image.Image, mask: Image.Image, inpaint_prompt):
-
-    pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
-                                                             torch_dtype=torch.float16, 
-                                                             variant="fp16").to("cuda")
-
-    guidance_scale = 8
-    num_inference_steps = 20
-    strength=0.99
-
-    inpainted_image = pipe(prompt=inpaint_prompt, image=image, mask_image=mask, 
-                        num_inference_steps=num_inference_steps, guidance_scale=guidance_scale,strength=strength
-                        ,width=mask.size[0], height=mask.size[1]).images[0]
-    
-    return inpainted_image
-
 def segment(sam_predictor, image, coordinates) -> np.ndarray:
-    sam_predictor.set_image(image)
-     
+
     if coordinates.shape[1] == 4: # box
         result_masks = []
         for coord in coordinates:  # box가 여러개인 경우에는 하나씩 처리해야 함
@@ -207,7 +171,7 @@ def segment(sam_predictor, image, coordinates) -> np.ndarray:
 
         index = np.argmax(scores)
         combined_mask = masks[index][np.newaxis, :, :]
-    
+
     mask_annotator = sv.MaskAnnotator(sv.Color.from_hex(color_hex=random_hex_color()))
     detections = sv.Detections(
         xyxy=sv.mask_to_xyxy(masks=combined_mask),
@@ -216,18 +180,18 @@ def segment(sam_predictor, image, coordinates) -> np.ndarray:
     # detections = detections[detections.area == np.max(detections.area)]
     segmented_image = mask_annotator.annotate(scene=cv2.cvtColor(image, cv2.COLOR_RGB2BGR), detections=detections)
     segmented_image = cv2.cvtColor(segmented_image, cv2.COLOR_BGR2RGB)
-            
+
     return combined_mask, segmented_image   
-        
+    
+def sd_inpaint(image: Image.Image, mask: Image.Image, inpaint_prompt):
 
+    pipe = get_sd_inpaint()
+    inpainted_image = pipe(prompt=inpaint_prompt, image=image, mask_image=mask, width=mask.size[0], height=mask.size[1]).images[0]
+    
+    return inpainted_image
+   
 def lama_cleaner(image, mask, device):
-    LAMA_MODEL_URL = os.environ.get(
-        "LAMA_MODEL_URL",
-        "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
-    )
-    LAMA_MODEL_MD5 = os.environ.get("LAMA_MODEL_MD5", "e3aa4aaa15225a33ec84f9f4bc47e500")
-
-    model = load_jit_model(LAMA_MODEL_URL, device, LAMA_MODEL_MD5).eval()
+    model = get_lama_cleaner()
     
     image = norm_img(image)
     mask = norm_img(mask)

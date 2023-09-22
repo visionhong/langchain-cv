@@ -59,12 +59,12 @@ def main():
         add_page_title()
         
         st.write("")
-        tab1, tab2 = st.tabs(["Image Editer", "Image Generator"])
+        tab1, tab2 = st.tabs(["Image Editor", "Image Generator"])
         
         with tab1:
             st.markdown(
                 """
-                ##### Image Editer
+                ##### Image Editor
                 이미지에서 객체를 바꾸거나 지우고, 이미지 스타일을 변환할 수 있습니다.
                 """
             )

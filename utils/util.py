@@ -127,8 +127,7 @@ def combine_masks(mask_list):
     return combined_mask[np.newaxis, :, :]
 
 def random_hex_color():
-    color = random.randrange(0, 2**24)
-    hex_color = hex(color)
-    std_color = "#" + hex_color[2:]
+    color_list = ["#caff70", "#07ccff", "#fa0087", "#f88379", "#7d37ff"]
+    hex_color = random.choice(color_list)
     
-    return std_color
+    return hex_color

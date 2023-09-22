@@ -3,39 +3,20 @@ sys.path.append('Grounded-Segment-Anything')
 sys.path.append('Grounded-Segment-Anything/EfficientSAM')
 
 import streamlit as st
-
-import os
 from pydantic import BaseModel, Field
 from typing import Optional, Type, List
-
-import pandas as pd
 import numpy as np
 import torch
-import torchvision
-import cv2
-from PIL import Image, ImageOps
-import matplotlib.pyplot as plt
-import plotly.express as px
-
+from PIL import Image
 import supervision as sv
 from langchain.tools import BaseTool
-
-from diffusers import StableDiffusionInstructPix2PixPipeline, EulerAncestralDiscreteScheduler
-from diffusers import AutoPipelineForInpainting
-from transformers import CLIPProcessor, CLIPModel
-from transformers import BlipProcessor, BlipForConditionalGeneration
-
-from groundingdino.util.inference import Model
-# from EfficientSAM.LightHQSAM.setup_light_hqsam import setup_model
-from segment_anything import sam_model_registry, SamPredictor
-from utils.lama_cleaner_helper import norm_img, load_jit_model
 
 from utils.inference import (
     image_captioner,
     zero_shot_image_classification,
     grounded_sam,
     instruct_pix2pix,
-    light_hqsam,
+    sam,
     sd_inpaint,
     lama_cleaner,
     wurstchen
@@ -43,7 +24,7 @@ from utils.inference import (
 
 
 def sam_inpaint(image, prompt, coordinates):
-    image, mask = light_hqsam(image, coordinates)
+    image, mask = sam(image, coordinates)
     image = Image.fromarray(image)
     mask = Image.fromarray(mask)
     
@@ -52,26 +33,19 @@ def sam_inpaint(image, prompt, coordinates):
 
 
 def image_transform(prompt):
-    image = Image.fromarray(st.session_state["inference_image"][st.session_state["image_state"]])
+    image = st.session_state["inference_image"][st.session_state["image_state"]]
     
-    if st.session_state["mask"] == False:  # 마스크가 없다면 이미지 전체 변환(pix2pix)
-        print("instruct_pix2pix Start")
+    if st.session_state["coord"] == False:  # 마스크가 없다면 이미지 전체 변환(pix2pix)
         transform_pillow = instruct_pix2pix(image, prompt)[0]
     else: # 마스크가 있다면 특정 영역만 inpaint
-        print("inpaint Start")
         mask = Image.fromarray(st.session_state["mask"])
         transform_pillow = sd_inpaint(image, mask, prompt)
             
     
     return transform_pillow
 
-def object_erase():
-    print("erase Start")
-    image = st.session_state["inference_image"][st.session_state["image_state"]]
-    mask = st.session_state["mask"]
-
-    transform_pillow = lama_cleaner(image, mask, "cuda")
-
+def object_erase(image, mask, device):
+    transform_pillow = lama_cleaner(image, mask, device)
     return transform_pillow
 
 
@@ -91,7 +65,6 @@ class ZeroShotObjectDetectoonCheckInput(BaseModel):
 
 class ImageTransformCheckInput(BaseModel):
     prompt: str = Field(..., description="prompt for inpainting the image")
-    coord: bool = Field(..., description="coordinates exist")
 
 
 class ImageCaptionTool(BaseTool):
@@ -154,7 +127,7 @@ class ImageTransformTool(BaseTool):
         st.session_state["image_state"] += 1
         
         torch.cuda.empty_cache()
-        return "complete!"
+        return True
     
     def _arun(self, query: str):
         raise NotImplementedError("This tool does not support async")
@@ -164,16 +137,25 @@ class ImageTransformTool(BaseTool):
 class ObjectEraseTool(BaseTool):  
     name = "object_erase"
     description = """
-    Please use this tool when you want to erase or delete certain objects from an image.
+    Please use this tool when you want to clean, erase or delete certain objects from an image.
     """
     
-    def _run(self):
-        transform_pillow = object_erase()
+    def _run(self, prompt=None):
+        pil_image = st.session_state["inference_image"][st.session_state["image_state"]]
+        np_image = np.array(pil_image)
+        try:
+            mask = st.session_state["mask"]
+        except:
+            st.exception(RuntimeError('There is no mask. Please masking the object in the drawing tool.'))
+            return False
+
+        transform_pillow = object_erase(np_image, mask, "cuda")
+    
         st.session_state["inference_image"].insert(st.session_state["image_state"]+1, transform_pillow)
         st.session_state["image_state"] += 1
         
         torch.cuda.empty_cache()
-        return "complete!"
+        return True
     
     def _arun(self, query: str):
         raise NotImplementedError("This tool does not support async")

@@ -9,20 +9,15 @@ from PIL import Image, ImageOps
 import numpy as np
 
 from utils.util import resize_image, xywh2xyxy
-from utils.template import inference_template
+from utils.template import image_editor_template
 from utils.agent import image_editor_agent
-from utils.action import backward_inference_image, forward_inference_image, reset_inference_image
-from utils.inference import light_hqsam
+from utils.action import backward_inference_image, forward_inference_image, reset_inference_image, reset_coord
+from utils.inference import sam
 
 def image_editor():
     add_page_title()
     
     st.caption("기능: image captioning, zero-shot image classification, zero-shot object detection, image2image, inpaint, erase", unsafe_allow_html=True)
-    
-    if "req_history" not in st.session_state:
-        st.session_state["req_history"] = []
-        st.session_state["res_history"] = []
-
 
     uploaded_image = st.file_uploader("Upload a your image", type=["jpg", "jpeg", "png"])
     if uploaded_image is not None:  
@@ -38,23 +33,26 @@ def image_editor():
             st.session_state["sam_image"] = None
             st.session_state["num_coord"] = 0
             
-        # coord를 모두 지웠을 때 맨 처음 sam을 지우기 ㄴ위함
+        # coord를 모두 지웠을 때 맨 처음 sam을 지우기 위함
         if "canvas" in st.session_state and st.session_state["canvas"] is not None:  
             df = pd.json_normalize(st.session_state["canvas"]['raw']["objects"])
             if st.session_state["sam_image"] != None and len(df)== 0:
                 st.session_state["num_coord"] = 0
-                st.experimental_rerun()
+                st.session_state["sam_image"] = None
+                # st.experimental_rerun()
         
         
-        drawing_mode = st.selectbox("Drawing tool:", ("point", "rect", "freedraw"))
+        drawing_mode = st.selectbox("Drawing tool:", ("point", "rect", "freedraw"), on_change=reset_coord)
         if drawing_mode == "freedraw":
-            anno_color = st.color_picker("Annotation color: ", "#141412") + "77"
+            col1, col2 = st.columns(2)
+            anno_color = col1.color_picker("Annotation color: ", "#141412") + "77"
+            brush_width = col2.number_input("Brush width", value=40)
         else:
             anno_color = st.color_picker("Annotation color: ", "#EA1010") + "77"
         
         canvas = st_canvas(
             fill_color=anno_color,
-            stroke_width=40 if drawing_mode == "freedraw" else 2,
+            stroke_width=brush_width if drawing_mode == "freedraw" else 2,
             stroke_color="black" if drawing_mode != "freedraw" else anno_color,
             background_image=st.session_state["sam_image"] if st.session_state["num_coord"] != 0 else st.session_state["inference_image"][st.session_state["image_state"]],
             height=st.session_state["inference_image"][0].height,
@@ -80,77 +78,48 @@ def image_editor():
             file_name=uploaded_image.name,
             mime="image/png",
         )
-
         
-        chat = st.expander("Chat History", expanded=True)
-        with chat:
-            for (user, ai) in zip(st.session_state["req_history"], st.session_state["res_history"]):
-                with st.chat_message("user"):
-                    st.write(user)
-                    
-                with st.chat_message("assistant"):
-                    if isinstance(ai, str):
-                        st.markdown(ai)
-                    
-            if prompt:  # 채팅 엔터를 누르자 마자 사용자의 입력이 바로 보이도록 함
-                with st.chat_message("user"):
-                    st.write(prompt)
-
         
         if st.session_state["canvas"] is not None:       
             df = pd.json_normalize(st.session_state["canvas"]['raw']["objects"])
             if len(df) == 0:
-                st.session_state["num_coord"] = 0
+                st.session_state["coord"] = False
+            else:    
+                st.session_state["coord"] = True
+
+            
             if len(df) != 0 and st.session_state["num_coord"] != len(df):
                 st.session_state["num_coord"] = len(df)
-                st.session_state["mask"] = True
                 
                 if drawing_mode == "rect":
                     coordinates = xywh2xyxy(df[["left", "top", "width", "height"]].values)
+        
+                    image, mask, segmented_image = sam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
                     
-                    image, mask, segmented_image = light_hqsam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
-
                     st.session_state["sam_image"] = segmented_image
-                    st.session_state["mask"] = Image.fromarray(mask)
+                    st.session_state["mask"] = mask
                     st.experimental_rerun()
                     
                 elif drawing_mode == "point":
                     coordinates = df[["left", "top"]].values
                     
-                    image, mask, segmented_image = light_hqsam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
+                    image, mask, segmented_image = sam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
                     
                     st.session_state["sam_image"] = segmented_image
-                    st.session_state["mask"] = Image.fromarray(mask)
+                    st.session_state["mask"] = mask
                     st.experimental_rerun()
                     
                 elif drawing_mode == "freedraw":
                     st.session_state["mask"] = canvas.image_data[:, :, -1] > 0
-            else:
-                st.session_state["mask"] = False
-    
-
-            
-                
-               
-            
-            
-        
+          
+                    
         if prompt:
-            st.session_state["req_history"].append(prompt)
-            with chat:
-                with st.chat_message("assistant"):
-                    st.write("AI")
-                    with st.spinner(text="In progress..."):
-                            
-                                    
-                                    
-                        agent = image_editor_agent()                    
-                        response=agent(inference_template(prompt=prompt))
-        
-                        if isinstance(response['intermediate_steps'][-1][1], str):  # Tool의 return 값이 string인 경우에 아래코드 수행 (자연스러운 한국어 번역을 위함)
-                            st.session_state["res_history"].append(response['output'])
-                            
-            st.experimental_rerun()  # chat history 업데이트를 위함
+            with st.spinner(text="Please wait..."):
+                agent = image_editor_agent()                    
+                agent(image_editor_template(prompt=prompt))
+                st.session_state["num_coord"] = 0
+                st.session_state["canvas"]['raw']["objects"] = []
+                st.experimental_rerun()
     else:
         st.session_state.clear()               
 

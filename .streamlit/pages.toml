@@ -10,7 +10,7 @@ is_section = true
 
 [[pages]]
 path = "app/image_editor.py"
-name = "Image Editer"
+name = "Image Editor"
 icon = "✏️" 
 
 [[pages]]
