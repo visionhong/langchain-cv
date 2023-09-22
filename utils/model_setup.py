@@ -5,8 +5,7 @@ import torch
 
 from diffusers import StableDiffusionInstructPix2PixPipeline, EulerAncestralDiscreteScheduler, AutoPipelineForText2Image, StableDiffusionInpaintPipeline
 from segment_anything import SamPredictor
-
-from EfficientSAM.MobileSAM.setup_light_hqsam import setup_model
+from EfficientSAM.MobileSAM.setup_mobile_sam import setup_model
 from utils.lama_cleaner_helper import load_jit_model
 
 @st.cache_resource

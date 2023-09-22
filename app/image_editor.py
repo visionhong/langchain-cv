@@ -42,27 +42,30 @@ def image_editor():
                 # st.experimental_rerun()
         
         
-        drawing_mode = st.selectbox("Drawing tool:", ("point", "rect", "freedraw"), on_change=reset_coord)
+        drawing_mode = st.selectbox("Drawing tool:", ("rect", "point", "freedraw"), on_change=reset_coord)
         if drawing_mode == "freedraw":
             col1, col2 = st.columns(2)
             anno_color = col1.color_picker("Annotation color: ", "#141412") + "77"
             brush_width = col2.number_input("Brush width", value=40)
         else:
-            anno_color = st.color_picker("Annotation color: ", "#EA1010") + "77"
+            anno_color = st.color_picker("Annotation color: ", "#141412") + "77"
         
-        canvas = st_canvas(
-            fill_color=anno_color,
-            stroke_width=brush_width if drawing_mode == "freedraw" else 2,
-            stroke_color="black" if drawing_mode != "freedraw" else anno_color,
-            background_image=st.session_state["sam_image"] if st.session_state["num_coord"] != 0 else st.session_state["inference_image"][st.session_state["image_state"]],
-            height=st.session_state["inference_image"][0].height,
-            width=st.session_state["inference_image"][0].width,
-            drawing_mode=drawing_mode,
-            key="canvas",
-            point_display_radius=4,
-            update_streamlit=True
-        )
-                
+        col1, col2 = st.columns((0.1,1))
+        with col2:   
+            canvas = st_canvas(
+                fill_color=anno_color,
+                stroke_width=brush_width if drawing_mode == "freedraw" else 2,
+                stroke_color="black" if drawing_mode != "freedraw" else anno_color,
+                background_image=st.session_state["sam_image"] if st.session_state["num_coord"] != 0 else st.session_state["inference_image"][st.session_state["image_state"]],
+                height=st.session_state["inference_image"][0].height,
+                width=st.session_state["inference_image"][0].width,
+                drawing_mode=drawing_mode,
+                key="canvas",
+                point_display_radius=4,
+                update_streamlit=True
+            )
+            
+               
         col1, col2, _, col3, col4 = st.columns((4,4,10,3,4))
         col1.button("backward", on_click=backward_inference_image, use_container_width=True)
         col2.button("forward", on_click=forward_inference_image, use_container_width=True)
