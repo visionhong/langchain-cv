@@ -2,4 +2,4 @@
 Langchain for Computer Vision
 
 
-[![Video Label](http://img.youtube.com/vi/NcU5xeHIGUE)](https://youtube/NcU5xeHIGUE)
+[![Video](https://img.youtube.com/vi/NcU5xeHIGUE/0.jpg)](https://www.youtube.com/watch?v=NcU5xeHIGUE)
