@@ -30,10 +30,9 @@ def sam_inpaint(image, prompt, coordinates):
     return inpainted_image
 
 def image_transform(pil_image, prompt):
-
     if st.session_state["coord"] == False:  # 마스크가 없다면 이미지 전체 변환(pix2pix)
         transform_pillow = instruct_pix2pix(pil_image, prompt)[0]
-    else: # 마스크가 있다면 특정 영역만 inpaint
+    else: # 마스크가 있다면 특정 영역 inpaint
         mask = Image.fromarray(st.session_state["mask"])
         transform_pillow = sd_inpaint(pil_image, mask, prompt)
             
@@ -51,7 +50,7 @@ class ZeroShotObjectDetectoonCheckInput(BaseModel):
     class_list: List[str] = Field(..., description="List of situation the prompt is trying to find in image")
 
 class ImageTransformCheckInput(BaseModel):
-    prompt: str = Field(..., description="prompt for inpainting the image")
+    prompt: str = Field(..., description="prompt for transform the image")
 
 
 class ImageGenerationCheckInput(BaseModel):

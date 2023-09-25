@@ -8,7 +8,6 @@ def image_editor_template(prompt):
             prompt: {prompt}
             
             Make sure prompt must be in English when using the tool.
-            Make sure to provide the response after using a tool.
         """
     )
     

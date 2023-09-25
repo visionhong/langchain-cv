@@ -17,9 +17,7 @@ def image_editor_agent():
         tools=tools,
         llm=ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", request_timeout=120),
         max_iterations=1,
-        verbose=True,
-        early_stopping_method='generate',
-        return_intermediate_steps=True
+        verbose=True
     )
     
 def image_generator_agent():
