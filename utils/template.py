@@ -5,15 +5,14 @@ from langchain import PromptTemplate
 def image_editor_template(prompt):         
     prompt_template = PromptTemplate.from_template(
         """
-            input_prompt: {prompt}
+            prompt: {prompt}
             
             Make sure prompt must be in English when using the tool.
             Make sure to provide the response after using a tool.
-            Answer must be "None"
         """
     )
     
-    prompt = prompt_template.format(prompt = prompt)
+    prompt = prompt_template.format(prompt=prompt)
     return prompt
 
 

@@ -7,6 +7,7 @@ import cv2
 from io import BytesIO
 from PIL import Image, ImageOps
 import numpy as np
+import torch
 
 from utils.util import resize_image, xywh2xyxy
 from utils.template import image_editor_template
@@ -118,8 +119,14 @@ def image_editor():
                     
         if prompt:
             with st.spinner(text="Please wait..."):
-                agent = image_editor_agent()                    
-                agent(image_editor_template(prompt=prompt))
+                agent = image_editor_agent()                  
+                transform_pillow = agent(image_editor_template(prompt=prompt))['output']
+                
+                st.session_state["inference_image"].insert(st.session_state["image_state"]+1, transform_pillow)
+                st.session_state["image_state"] += 1
+                
+                torch.cuda.empty_cache()
+                
                 st.session_state["num_coord"] = 0
                 st.session_state["canvas"]['raw']["objects"] = []
                 st.experimental_rerun()

@@ -12,8 +12,6 @@ import supervision as sv
 
 from diffusers import  AutoPipelineForText2Image
 from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
-from transformers import CLIPProcessor, CLIPModel
-from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from groundingdino.util.inference import Model
 from segment_anything import SamPredictor
@@ -22,33 +20,6 @@ from utils.lama_cleaner_helper import norm_img
 from utils.util import combine_masks, random_hex_color
 from utils.model_setup import get_sam, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix
 
-
-def image_captioner(img_path):
-    image = Image.open(img_path).convert('RGB')
-    model_name = "Salesforce/blip-image-captioning-large"
-    device = "cpu"  # cuda
-
-    processor = BlipProcessor.from_pretrained(model_name)
-    model = BlipForConditionalGeneration.from_pretrained(model_name).to(device)
-
-    inputs = processor(image, return_tensors='pt').to(device)
-    output = model.generate(**inputs, max_new_tokens=20)
-
-    caption = processor.decode(output[0], skip_special_tokens=True)
-    return caption
-
-def zero_shot_image_classification(image_path, possible_list):
-    model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
-    image = Image.open(image_path)
-    inputs = processor(text=possible_list, images=image, return_tensors="pt", padding=True)
-
-    outputs = model(**inputs)
-    logits_per_image = outputs.logits_per_image # this is the image-text similarity score
-    probs = logits_per_image.softmax(dim=1)
-    
-    return probs
 
 def grounded_sam(image_path, situation_list):
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -124,7 +95,6 @@ def grounded_sam(image_path, situation_list):
     annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections, labels=labels)
 
     return cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
-
 
 def instruct_pix2pix(image, prompt):
     pipe = get_instruct_pix2pix()
