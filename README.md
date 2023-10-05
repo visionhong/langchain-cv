@@ -4,4 +4,6 @@ This repository is an application that uses LangChain to execute various compute
 
 <br>
 
-Work in progress...
+TODO:
+Generating good results in more specialized fields by training a vision model with a custom dataser from a specific field
+Converting vision model inference from scratch to API(with Nvidia Triton Server)
