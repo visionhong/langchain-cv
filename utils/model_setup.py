@@ -65,7 +65,7 @@ def get_instruct_pix2pix():
 def get_general_generator(use_controlnet=False, device='cuda'):
     if use_controlnet:
         if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
-            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            controlnet = ControlNetModel.from_pretrained("/volume/checkpoints/sketch").to(device)
             model_name = "sketch_image"
             print("use sketch net")
         else:
@@ -73,18 +73,18 @@ def get_general_generator(use_controlnet=False, device='cuda'):
             model_name = "canny_image"
          
         pipeline = StableDiffusionControlNetPipeline.from_pretrained(
-            "warp-ai/wuerstchen",  # This line
-            safety_checker=None,
+            "/volume/checkpoints/realistic",
             torch_dtype=torch.float16,
             controlnet=controlnet,
         ).to(device)
         
     else:
         pipeline = StableDiffusionPipeline.from_pretrained(
-            "warp-ai/wuerstchen",  # This line
-            safety_checker=None,
+            "/volume/checkpoints/realistic",
             torch_dtype=torch.float16,
         ).to(device)
+        
+        model_name=None
         
     return pipeline, model_name
 
@@ -93,7 +93,7 @@ def get_general_generator(use_controlnet=False, device='cuda'):
 def get_male_anime_generator(use_controlnet=False, device='cuda'):
     if use_controlnet:
         if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
-            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            controlnet = ControlNetModel.from_pretrained("/volume/checkpoints/sketch").to(device)
             model_name = "sketch_image"
             print("use sketch net")
         else:
@@ -101,16 +101,17 @@ def get_male_anime_generator(use_controlnet=False, device='cuda'):
             model_name = "canny_image"
             
         pipeline = StableDiffusionControlNetPipeline.from_pretrained(
-            "checkpoints/somman",  # This line
+            "/volume/checkpoints/somman",  # This line
             safety_checker=None,
             controlnet=controlnet,
         ).to(device)
         
     else:
         pipeline = StableDiffusionPipeline.from_pretrained(
-            "checkpoints/somman",  # This line
+            "/volume/checkpoints/somman",  # This line
             safety_checker=None,
         ).to(device)
+        model_name=None
         
     return pipeline, model_name
 
@@ -119,7 +120,7 @@ def get_male_anime_generator(use_controlnet=False, device='cuda'):
 def get_female_anime_generator(use_controlnet=False, device='cuda'):
     if use_controlnet:
         if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
-            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            controlnet = ControlNetModel.from_pretrained("/volume/checkpoints/sketch").to(device)
             model_name = "sketch_image"
             print("use sketch net")
         else:
@@ -127,15 +128,16 @@ def get_female_anime_generator(use_controlnet=False, device='cuda'):
             model_name = "canny_image"
             
         pipeline = StableDiffusionControlNetPipeline.from_pretrained(
-            "checkpoints/female",  # This line
+            "/volume/checkpoints/female",  # This line
             safety_checker=None,
             controlnet=controlnet,
         ).to(device)
         
     else:
         pipeline = StableDiffusionPipeline.from_pretrained(
-            "checkpoints/female",  # This line
+            "/volume/checkpoints/female",  # This line
             safety_checker=None,
         ).to(device)
+        model_name=None
         
     return pipeline, model_name

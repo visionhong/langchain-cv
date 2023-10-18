@@ -75,7 +75,7 @@ def lama_cleaner(image, mask, device):
     return Image.fromarray(cur_res)
 
 
-def wurstchen(prompt, num_images, device, use_controlnet=False):
+def general_generator(prompt, num_images, device, use_controlnet=False):
 
     if use_controlnet:
         pipe, model_name = get_general_generator(use_controlnet=True, device=device)
@@ -90,7 +90,7 @@ def wurstchen(prompt, num_images, device, use_controlnet=False):
 
         return images
     else:
-        pipe = get_general_generator(use_controlnet=False, device=device) 
+        pipe, _ = get_general_generator(use_controlnet=False, device=device) 
         
         images = pipe(
             prompt=prompt,
@@ -135,7 +135,7 @@ def male_anime_generator(prompt, num_images, device, use_controlnet=False):
 
         return images
     else:
-        pipe = get_male_anime_generator(use_controlnet=False, device=device) 
+        pipe, _ = get_male_anime_generator(use_controlnet=False, device=device) 
         
         images = pipe(
             prompt=prompt,
@@ -164,7 +164,7 @@ def female_anime_generator(prompt, num_images, device, use_controlnet=False):
 
         return images
     else:
-        pipe = get_female_anime_generator(use_controlnet=False, device=device) 
+        pipe, _ = get_female_anime_generator(use_controlnet=False, device=device) 
         
         images = pipe(
             prompt=prompt,

@@ -1,13 +1,10 @@
 import streamlit as st
 from st_pages import add_page_title
 from streamlit_drawable_canvas import st_canvas
-import supervision as sv
 import pandas as pd
-import cv2
 from io import BytesIO
 from PIL import Image, ImageOps
 import numpy as np
-import torch
 
 from utils.util import resize_image, xywh2xyxy
 from utils.template import image_editor_template

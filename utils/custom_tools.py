@@ -16,7 +16,7 @@ from utils.inference import (
     instruct_pix2pix,
     sd_inpaint,
     lama_cleaner,
-    wurstchen,
+    general_generator,
     male_anime_generator,
     female_anime_generator
 )
@@ -96,16 +96,16 @@ class ObjectEraseTool(BaseTool):
     
     
 class ImageGenerationTool(BaseTool):  
-    name = "wurstchen"
+    name = "general_generator"
     description = """
     Please use this tool when you want to generate images.
     """
     
     def _run(self, prompt: str, num_images: int, device: str = "cuda"):
-        shutil.rmtree("./frontend/public/images")
+        shutil.rmtree("./frontend/public/images", ignore_errors=True)
         os.makedirs("./frontend/public/images", exist_ok=True)
         
-        images = wurstchen(prompt, num_images, device) 
+        images = general_generator(prompt, num_images, device, use_controlnet=st.session_state["use_controlnet"]) 
         
         for idx, image in enumerate(images):
             image.save(f"./frontend/public/images/{idx}.png")
@@ -127,7 +127,7 @@ class MaleAnimeGenertorTool(BaseTool):
     return_direct=True
     
     def _run(self, prompt: str, num_images: int):
-        shutil.rmtree("./frontend/public/images")
+        shutil.rmtree("./frontend/public/images", ignore_errors=True)
         os.makedirs("./frontend/public/images", exist_ok=True)
         images = male_anime_generator(prompt, num_images, device="cuda", use_controlnet=st.session_state["use_controlnet"]) 
         
@@ -151,7 +151,7 @@ class FemaleAnimeGenertorTool(BaseTool):
     return_direct=True
     
     def _run(self, prompt: str, num_images: int):
-        shutil.rmtree("./frontend/public/images")
+        shutil.rmtree("./frontend/public/images", ignore_errors=True)
         os.makedirs("./frontend/public/images", exist_ok=True)
         images = female_anime_generator(prompt, num_images, device="cuda", use_controlnet=st.session_state["use_controlnet"]) 
         
