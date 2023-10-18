@@ -18,7 +18,7 @@ from utils.inference import sam
 def image_editor():
     add_page_title()
     
-    st.caption("기능: image captioning, zero-shot image classification, zero-shot object detection, image2image, inpaint, erase", unsafe_allow_html=True)
+    st.caption("기능: zero-shot segmentation, image2image, inpaint, erase", unsafe_allow_html=True)
 
     uploaded_image = st.file_uploader("Upload a your image", type=["jpg", "jpeg", "png"])
     if uploaded_image is not None:  
@@ -94,20 +94,33 @@ def image_editor():
             
             if len(df) != 0 and st.session_state["num_coord"] != len(df):
                 st.session_state["num_coord"] = len(df)
+                st.session_state["freedraw"] = False
                 
                 if drawing_mode == "rect":
-                    coordinates = xywh2xyxy(df[["left", "top", "width", "height"]].values)
-        
-                    image, mask, segmented_image = sam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
+                    pos_coords = xywh2xyxy(df[["left", "top", "width", "height"]].values)
+                    neg_coords = np.zeros([1, 2])
+                    labels = labels = np.array([2, 3])
+                    
+                    image, mask, segmented_image = sam(image=st.session_state["inference_image"][st.session_state["image_state"]],
+                                                       pos_coords=pos_coords,
+                                                       neg_coords=neg_coords,
+                                                       labels=labels)
                     
                     st.session_state["sam_image"] = segmented_image
                     st.session_state["mask"] = mask
                     st.experimental_rerun()
                     
                 elif drawing_mode == "point":
-                    coordinates = df[["left", "top"]].values
+
+                    pos_coords = df[["left", "top"]].values
+                    neg_coords = np.zeros([1, 2])
+                    labels = np.array([1])
                     
-                    image, mask, segmented_image = sam(st.session_state["inference_image"][st.session_state["image_state"]], coordinates)
+                    image, mask, segmented_image = sam(image=st.session_state["inference_image"][st.session_state["image_state"]],
+                                                       pos_coords=pos_coords,
+                                                       neg_coords=neg_coords,
+                                                       labels=labels)
+                    
                     
                     st.session_state["sam_image"] = segmented_image
                     st.session_state["mask"] = mask
@@ -115,7 +128,8 @@ def image_editor():
                     
                 elif drawing_mode == "freedraw":
                     st.session_state["mask"] = canvas.image_data[:, :, -1] > 0
-          
+                    st.session_state["freedraw"] = True
+                
                     
         if prompt:
             with st.spinner(text="Please wait..."):
@@ -124,8 +138,6 @@ def image_editor():
                 
                 st.session_state["inference_image"].insert(st.session_state["image_state"]+1, transform_pillow)
                 st.session_state["image_state"] += 1
-                
-                torch.cuda.empty_cache()
                 
                 st.session_state["num_coord"] = 0
                 st.session_state["canvas"]['raw']["objects"] = []

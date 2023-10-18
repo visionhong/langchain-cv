@@ -28,8 +28,3 @@ RUN npm i && npm run build
 
 WORKDIR /home/appuser/langchain-cv
 RUN pip install --no-cache-dir -r requirements.txt
-
-WORKDIR /home/appuser/langchain-cv/Grounded-Segment-Anything
-RUN python -m pip install --no-cache-dir -e segment_anything && \
-    CUDA_HOME=/usr/local/cuda-11.7 pip install https://github.com/IDEA-Research/GroundingDINO/archive/refs/tags/v0.1.0-alpha2.tar.gz && \
-    python -m pip install --no-cache-dir -e GroundingDINO 

@@ -3,30 +3,24 @@ import streamlit as st
 import os
 import torch
 
-from diffusers import StableDiffusionInstructPix2PixPipeline, EulerAncestralDiscreteScheduler, AutoPipelineForText2Image, StableDiffusionInpaintPipeline
-from segment_anything import SamPredictor
-from EfficientSAM.MobileSAM.setup_mobile_sam import setup_model
+from diffusers import StableDiffusionInstructPix2PixPipeline, EulerAncestralDiscreteScheduler, StableDiffusionInpaintPipeline
+from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, StableDiffusionPipeline
+
+from dotenv import load_dotenv
+
 from utils.lama_cleaner_helper import load_jit_model
+import tritonclient.http
 
-@st.cache_resource
-def get_sam(image):
-    print("Mobile SAM setup!")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # checkpoint = torch.load("./checkpoints/sam_hq_vit_tiny.pth")
-    # light_hqsam = setup_model()
-    # light_hqsam.load_state_dict(checkpoint, strict=True)
-    # light_hqsam.to(device)
 
-    checkpoint = torch.load("./checkpoints/mobile_sam.pt")
-    mobile_sam = setup_model()
-    mobile_sam.load_state_dict(checkpoint, strict=True)
-    mobile_sam.to(device)
+def get_triton_client():
+    print("Nvidia Triton Server setup!")
+    load_dotenv()
+    url = os.getenv("TRITON_HTTP_URL")
     
-    sam_predictor = SamPredictor(mobile_sam)
-    sam_predictor.set_image(image)
-    
-    return sam_predictor
+    triton_client = tritonclient.http.InferenceServerClient(url=url, verbose=False)  
+      
+    return triton_client
+
 
 @st.cache_resource
 def get_sd_inpaint():
@@ -39,7 +33,6 @@ def get_sd_inpaint():
     ).to(device)
     
     return pipe
-
 
 
 @st.cache_resource
@@ -67,3 +60,55 @@ def get_instruct_pix2pix():
                                                                     safety_checker=None).to(device)
     pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
     return pipe
+
+
+@st.cache_resource
+def get_male_anime_generator(use_controlnet=False, device='cuda'):
+    if use_controlnet:
+        if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
+            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            model_name = "sketch_image"
+            print("use sketch net")
+        else:
+            controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny").to(device)
+            model_name = "canny_image"
+            
+        pipeline = StableDiffusionControlNetPipeline.from_pretrained(
+            "checkpoints/somman",  # This line
+            safety_checker=None,
+            controlnet=controlnet,
+        ).to(device)
+        
+    else:
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            "checkpoints/somman",  # This line
+            safety_checker=None,
+        ).to(device)
+        
+    return pipeline, model_name
+
+
+@st.cache_resource
+def get_female_anime_generator(use_controlnet=False, device='cuda'):
+    if use_controlnet:
+        if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
+            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            model_name = "sketch_image"
+            print("use sketch net")
+        else:
+            controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny").to(device)
+            model_name = "canny_image"
+            
+        pipeline = StableDiffusionControlNetPipeline.from_pretrained(
+            "checkpoints/female",  # This line
+            safety_checker=None,
+            controlnet=controlnet,
+        ).to(device)
+        
+    else:
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            "checkpoints/female",  # This line
+            safety_checker=None,
+        ).to(device)
+        
+    return pipeline, model_name

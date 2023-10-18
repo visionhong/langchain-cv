@@ -131,3 +131,25 @@ def random_hex_color():
     hex_color = random.choice(color_list)
     
     return hex_color
+
+
+def dilate_mask(mask, kernel_size=3, iterations=1):
+    mask = mask.astype(np.uint8)
+    # 커널 생성 (모든 방향으로 팽창)
+    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    
+    # 팽창 연산 적용
+    dilated_mask = cv2.dilate(mask, kernel, iterations=iterations)
+    
+    return dilated_mask
+
+def get_canny_image(image: np.ndarray):
+    low_threshold = 100
+    high_threshold = 200
+    # do canny edge detection
+    image_canny = cv2.Canny(image, low_threshold, high_threshold)
+    # convert to PIL image format
+    image_canny = image_canny[:, :, None]
+    image_canny = np.concatenate([image_canny, image_canny, image_canny], axis=2)
+    image_canny = Image.fromarray(image_canny)
+    return image_canny

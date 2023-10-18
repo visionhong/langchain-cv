@@ -65,14 +65,12 @@ def main():
             st.markdown(
                 """
                 ##### Image Editor
-                이미지에서 객체를 바꾸거나 지우고, 이미지 스타일을 변환할 수 있습니다.
+                Drawing Tool과 채팅을 통해 이미지에서 객체를 바꾸거나 지우고, 이미지 스타일을 변환할 수 있습니다.
                 """
             )
 
             st.markdown("#### Demo")
-            video_file = open('.assets/demo.mp4', 'rb')
-            video_bytes = video_file.read()
-            st.video(video_bytes)
+            st.video("https://www.youtube.com/watch?v=NcU5xeHIGUE") 
             
             st.write("")
             _, col = st.columns((15, 2))

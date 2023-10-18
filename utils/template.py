@@ -21,8 +21,7 @@ def image_generate_template(prompt, num_images):
             input_prompt: {prompt}
             num_images: {num_images}
             
-            The input_prompt must be in English.        
-            And respond should be "None".           
+            The input_prompt must be in English.           
         """
     )
     

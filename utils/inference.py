@@ -2,99 +2,17 @@ import sys
 sys.path.append('Grounded-Segment-Anything')
 sys.path.append('Grounded-Segment-Anything/EfficientSAM')
 
-import os
+import streamlit as st
 import numpy as np
 import torch
-import torchvision
-import cv2
 from PIL import Image, ImageOps
-import supervision as sv
 
 from diffusers import  AutoPipelineForText2Image
 from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
 
-from groundingdino.util.inference import Model
-from segment_anything import SamPredictor
-
 from utils.lama_cleaner_helper import norm_img
-from utils.util import combine_masks, random_hex_color
-from utils.model_setup import get_sam, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix
-
-
-def grounded_sam(image_path, situation_list):
-    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # GroundingDINO config and checkpoint
-    GROUNDING_DINO_CONFIG_PATH = "Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-    GROUNDING_DINO_CHECKPOINT_PATH = "./checkpoints/groundingdino_swint_ogc.pth"
-    grounding_dino_model = Model(model_config_path=GROUNDING_DINO_CONFIG_PATH, model_checkpoint_path=GROUNDING_DINO_CHECKPOINT_PATH)
-    
-    HQSAM_CHECKPOINT_PATH = "./checkpoints/sam_hq_vit_tiny.pth"
-    checkpoint = torch.load(HQSAM_CHECKPOINT_PATH)
-    
-    light_hqsam = setup_model()
-    light_hqsam.load_state_dict(checkpoint, strict=True)
-    light_hqsam.to(device=DEVICE)
-
-    sam_predictor = SamPredictor(light_hqsam)
-
-    # Predict classes and hyper-param for GroundingDINO
-    CLASSES = situation_list
-    BOX_THRESHOLD = 0.35
-    NMS_THRESHOLD = 0.8
-
-    image = cv2.imread(image_path)
-    
-    detections = grounding_dino_model.predict_with_classes(
-    image=image,
-    classes=CLASSES,
-    box_threshold=BOX_THRESHOLD,
-    text_threshold=BOX_THRESHOLD
-    )
-
-    # annotate image with detections
-    box_annotator = sv.BoxAnnotator()
-    labels = [
-        f"{CLASSES[class_id]} {confidence:0.2f}" 
-        for _, _, confidence, class_id, _ 
-        in detections]
-
-    print(f"Before NMS: {len(detections.xyxy)} boxes")
-    nms_idx = torchvision.ops.nms(
-        torch.from_numpy(detections.xyxy), 
-        torch.from_numpy(detections.confidence), 
-        NMS_THRESHOLD
-    ).numpy().tolist()
-
-    detections.xyxy = detections.xyxy[nms_idx]
-    detections.confidence = detections.confidence[nms_idx]
-    detections.class_id = detections.class_id[nms_idx]
-
-    sam_predictor.set_image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    
-    result_masks = []
-    for box in detections.xyxy:
-        masks, scores, logits = sam_predictor.predict(
-            box=box,
-            multimask_output=True
-        )
-        index = np.argmax(scores)
-        result_masks.append(masks[index])
-    detections.mask = np.array(result_masks)    
-
-    box_annotator = sv.BoxAnnotator()
-    mask_annotator = sv.MaskAnnotator()
-
-    labels = [
-        f"{CLASSES[class_id]} {confidence:0.2f}" 
-        for _, _, confidence, class_id, _ 
-        in detections]
-    
-    
-    annotated_image = mask_annotator.annotate(scene=image.copy(), detections=detections)
-    annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections, labels=labels)
-
-    return cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
+from utils.model_setup import get_triton_client, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix, get_male_anime_generator, get_female_anime_generator
+import tritonclient.http
 
 def instruct_pix2pix(image, prompt):
     pipe = get_instruct_pix2pix()
@@ -103,55 +21,34 @@ def instruct_pix2pix(image, prompt):
     images = pipe(prompt, image=image, num_inference_steps=20, image_guidance_scale=1.5, guidance_scale=7).images
     return images
 
-def sam(image, coordinates):
-    image = np.array(image)
-    sam_predictor = get_sam(image)
+def sam(image, neg_coords, pos_coords, labels):
     
-    mask, segmented_image = segment(
-        sam_predictor=sam_predictor,
-        image=image,
-        coordinates= coordinates
-        )
+    triton_client = get_triton_client()
+    image = np.array(image).copy()
     
-    if len(mask.shape) == 3:
-        mask = mask.squeeze(0)
+    pos_coords_in = tritonclient.http.InferInput("pos_coords", pos_coords.shape, "INT64")
+    neg_coords_in = tritonclient.http.InferInput("neg_coords", neg_coords.shape, "INT64")
+    labels_in = tritonclient.http.InferInput("labels", labels.shape, "INT64")
+    image_in = tritonclient.http.InferInput("input_image", image.shape, "UINT8")
+
+    mask_out = tritonclient.http.InferRequestedOutput(name="mask", binary_data=False)
+    image_out = tritonclient.http.InferRequestedOutput(name="segmented_image", binary_data=False)
+        
+    pos_coords_in.set_data_from_numpy(pos_coords.astype(np.int64))
+    neg_coords_in.set_data_from_numpy(neg_coords.astype(np.int64))
+    labels_in.set_data_from_numpy(labels.astype(np.int64))
+    image_in.set_data_from_numpy(image.astype(np.uint8))
+
+    response = triton_client.infer(
+        model_name="sam", model_version="1", 
+        inputs=[pos_coords_in, neg_coords_in, labels_in, image_in], 
+        outputs=[mask_out, image_out]
+    )
+    mask = response.as_numpy("mask")
+    segmented_image = response.as_numpy("segmented_image")
     
     return image, mask, Image.fromarray(segmented_image)
-
-def segment(sam_predictor, image, coordinates) -> np.ndarray:
-
-    if coordinates.shape[1] == 4: # box
-        result_masks = []
-        for coord in coordinates:  # box가 여러개인 경우에는 하나씩 처리해야 함
-            masks, scores, logits = sam_predictor.predict(
-                box=coord,
-                multimask_output=True
-            )
-            index = np.argmax(scores)
-            result_masks.append(masks[index])
-        
-        combined_mask = combine_masks(result_masks) # 여러개의 mask를 or 연산
-            
-    else: # point
-        masks, scores, logits = sam_predictor.predict(
-            point_coords=coordinates,
-            point_labels=np.ones(len(coordinates)),
-            multimask_output=True
-        )
-
-        index = np.argmax(scores)
-        combined_mask = masks[index][np.newaxis, :, :]
-
-    mask_annotator = sv.MaskAnnotator(sv.Color.from_hex(color_hex=random_hex_color()))
-    detections = sv.Detections(
-        xyxy=sv.mask_to_xyxy(masks=combined_mask),
-        mask=combined_mask
-    )
-    # detections = detections[detections.area == np.max(detections.area)]
-    segmented_image = mask_annotator.annotate(scene=cv2.cvtColor(image, cv2.COLOR_RGB2BGR), detections=detections)
-    segmented_image = cv2.cvtColor(segmented_image, cv2.COLOR_BGR2RGB)
-
-    return combined_mask, segmented_image   
+ 
     
 def sd_inpaint(image: Image.Image, mask: Image.Image, inpaint_prompt):
 
@@ -164,6 +61,7 @@ def lama_cleaner(image, mask, device):
     model = get_lama_cleaner()
     
     image = norm_img(image)
+    
     mask = norm_img(mask)
 
     mask = (mask > 0) * 1
@@ -176,6 +74,7 @@ def lama_cleaner(image, mask, device):
     cur_res = np.clip(cur_res * 255, 0, 255).astype("uint8")
 
     return Image.fromarray(cur_res)
+
 
 def wurstchen(prompt, num_images, device):
     if torch.cuda.is_available():
@@ -193,3 +92,61 @@ def wurstchen(prompt, num_images, device):
     ).images
     
     return images
+
+
+def male_anime_generator(prompt, num_images, device, use_controlnet=False):
+
+    if use_controlnet:
+        pipe, model_name = get_male_anime_generator(use_controlnet=True, device=device)
+        
+        images = pipe(
+            prompt=prompt,
+            negative_prompt="7dirtywords,an10,bad-picture-chill-75v,badhandv4,EasyNegative,By bad artist -neg,negative_hand Negative Embedding _negative_hand,ng_deepnegative_v1_75t,Unspeakable-Horrors-Composition-4v,verybadimagenegative_v1.3,",
+            guidance_scale=7,
+            num_inference_steps=20,
+            image = st.session_state[model_name],
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
+    else:
+        pipe = get_male_anime_generator(use_controlnet=False, device=device) 
+        
+        images = pipe(
+            prompt=prompt,
+            negative_prompt="7dirtywords,an10,bad-picture-chill-75v,badhandv4,EasyNegative,By bad artist -neg,negative_hand Negative Embedding _negative_hand,ng_deepnegative_v1_75t,Unspeakable-Horrors-Composition-4v,verybadimagenegative_v1.3,",
+            guidance_scale=7,
+            num_inference_steps=20,
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
+    
+    
+def female_anime_generator(prompt, num_images, device, use_controlnet=False):
+
+    if use_controlnet:
+        pipe, model_name = get_female_anime_generator(use_controlnet=True, device=device)
+        
+        images = pipe(
+            prompt=prompt,
+            negative_prompt="(worst quality:2), (low quality:1.8), (normal quality:1.6), bad-hands-5,",
+            guidance_scale=7,
+            num_inference_steps=40,
+            image = st.session_state[model_name],
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
+    else:
+        pipe = get_female_anime_generator(use_controlnet=False, device=device) 
+        
+        images = pipe(
+            prompt=prompt,
+            negative_prompt="(worst quality:2), (low quality:1.8), (normal quality:1.6), bad-hands-5,",
+            guidance_scale=7,
+            num_inference_steps=40,
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
