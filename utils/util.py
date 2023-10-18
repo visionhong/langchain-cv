@@ -134,7 +134,7 @@ def random_hex_color():
 
 
 def dilate_mask(mask, kernel_size=3, iterations=1):
-    mask = mask.astype(np.uint8)
+    mask = mask.astype(np.uint8).squeeze()
     # 커널 생성 (모든 방향으로 팽창)
     kernel = np.ones((kernel_size, kernel_size), np.uint8)
     
@@ -142,6 +142,7 @@ def dilate_mask(mask, kernel_size=3, iterations=1):
     dilated_mask = cv2.dilate(mask, kernel, iterations=iterations)
     
     return dilated_mask
+
 
 def get_canny_image(image: np.ndarray):
     low_threshold = 100

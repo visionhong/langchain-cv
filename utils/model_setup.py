@@ -13,7 +13,6 @@ import tritonclient.http
 
 
 def get_triton_client():
-    print("Nvidia Triton Server setup!")
     load_dotenv()
     url = os.getenv("TRITON_HTTP_URL")
     
@@ -60,6 +59,34 @@ def get_instruct_pix2pix():
                                                                     safety_checker=None).to(device)
     pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
     return pipe
+
+
+@st.cache_resource
+def get_general_generator(use_controlnet=False, device='cuda'):
+    if use_controlnet:
+        if "sketch_image" in st.session_state and st.session_state["sketch_image"] != None:
+            controlnet = ControlNetModel.from_pretrained("checkpoints/sketch").to(device)
+            model_name = "sketch_image"
+            print("use sketch net")
+        else:
+            controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny").to(device)
+            model_name = "canny_image"
+         
+        pipeline = StableDiffusionControlNetPipeline.from_pretrained(
+            "warp-ai/wuerstchen",  # This line
+            safety_checker=None,
+            torch_dtype=torch.float16,
+            controlnet=controlnet,
+        ).to(device)
+        
+    else:
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            "warp-ai/wuerstchen",  # This line
+            safety_checker=None,
+            torch_dtype=torch.float16,
+        ).to(device)
+        
+    return pipeline, model_name
 
 
 @st.cache_resource

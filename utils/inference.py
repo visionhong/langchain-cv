@@ -11,7 +11,7 @@ from diffusers import  AutoPipelineForText2Image
 from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
 
 from utils.lama_cleaner_helper import norm_img
-from utils.model_setup import get_triton_client, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix, get_male_anime_generator, get_female_anime_generator
+from utils.model_setup import get_triton_client, get_sd_inpaint, get_lama_cleaner, get_instruct_pix2pix, get_male_anime_generator, get_female_anime_generator, get_general_generator
 import tritonclient.http
 
 def instruct_pix2pix(image, prompt):
@@ -22,7 +22,6 @@ def instruct_pix2pix(image, prompt):
     return images
 
 def sam(image, neg_coords, pos_coords, labels):
-    
     triton_client = get_triton_client()
     image = np.array(image).copy()
     
@@ -33,12 +32,12 @@ def sam(image, neg_coords, pos_coords, labels):
 
     mask_out = tritonclient.http.InferRequestedOutput(name="mask", binary_data=False)
     image_out = tritonclient.http.InferRequestedOutput(name="segmented_image", binary_data=False)
-        
+    
     pos_coords_in.set_data_from_numpy(pos_coords.astype(np.int64))
     neg_coords_in.set_data_from_numpy(neg_coords.astype(np.int64))
     labels_in.set_data_from_numpy(labels.astype(np.int64))
     image_in.set_data_from_numpy(image.astype(np.uint8))
-
+    
     response = triton_client.infer(
         model_name="sam", model_version="1", 
         inputs=[pos_coords_in, neg_coords_in, labels_in, image_in], 
@@ -46,7 +45,7 @@ def sam(image, neg_coords, pos_coords, labels):
     )
     mask = response.as_numpy("mask")
     segmented_image = response.as_numpy("segmented_image")
-    
+
     return image, mask, Image.fromarray(segmented_image)
  
     
@@ -76,22 +75,48 @@ def lama_cleaner(image, mask, device):
     return Image.fromarray(cur_res)
 
 
-def wurstchen(prompt, num_images, device):
-    if torch.cuda.is_available():
-        torch.set_default_tensor_type(torch.cuda.HalfTensor)
-        
-    pipeline = AutoPipelineForText2Image.from_pretrained("warp-ai/wuerstchen", torch_dtype=torch.float16).to(device)
+def wurstchen(prompt, num_images, device, use_controlnet=False):
 
-    images = pipeline(
-        prompt, 
-        width=1024,
-        height=1024,
-        prior_timesteps=DEFAULT_STAGE_C_TIMESTEPS,
-        prior_guidance_scale=4.0,
-        num_images_per_prompt=num_images,
-    ).images
+    if use_controlnet:
+        pipe, model_name = get_general_generator(use_controlnet=True, device=device)
+        
+        images = pipe(
+            prompt=prompt,
+            guidance_scale=7,
+            num_inference_steps=20,
+            image = st.session_state[model_name],
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
+    else:
+        pipe = get_general_generator(use_controlnet=False, device=device) 
+        
+        images = pipe(
+            prompt=prompt,
+            guidance_scale=7,
+            num_inference_steps=20,
+            num_images_per_prompt=num_images
+        ).images
+
+        return images
     
-    return images
+    
+    # if torch.cuda.is_available():
+    #     torch.set_default_tensor_type(torch.cuda.HalfTensor)
+        
+    # pipeline = AutoPipelineForText2Image.from_pretrained("warp-ai/wuerstchen", torch_dtype=torch.float16).to(device)
+
+    # images = pipeline(
+    #     prompt, 
+    #     width=1024,
+    #     height=1024,
+    #     prior_timesteps=DEFAULT_STAGE_C_TIMESTEPS,
+    #     prior_guidance_scale=4.0,
+    #     num_images_per_prompt=num_images,
+    # ).images
+    
+    # return images
 
 
 def male_anime_generator(prompt, num_images, device, use_controlnet=False):

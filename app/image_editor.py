@@ -99,8 +99,8 @@ def image_editor():
                 if drawing_mode == "rect":
                     pos_coords = xywh2xyxy(df[["left", "top", "width", "height"]].values)
                     neg_coords = np.zeros([1, 2])
-                    labels = labels = np.array([2, 3])
-                    
+                    labels = labels = np.array([2, 3])  # box width, box height
+
                     image, mask, segmented_image = sam(image=st.session_state["inference_image"][st.session_state["image_state"]],
                                                        pos_coords=pos_coords,
                                                        neg_coords=neg_coords,
@@ -114,7 +114,7 @@ def image_editor():
 
                     pos_coords = df[["left", "top"]].values
                     neg_coords = np.zeros([1, 2])
-                    labels = np.array([1])
+                    labels = np.array([1])  # point
                     
                     image, mask, segmented_image = sam(image=st.session_state["inference_image"][st.session_state["image_state"]],
                                                        pos_coords=pos_coords,
